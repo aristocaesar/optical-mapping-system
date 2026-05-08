@@ -6,8 +6,16 @@ from werkzeug.security import check_password_hash
 
 auth_bp = Blueprint('auth', __name__)
 
+@auth_bp.route('/')
+def index():
+    if 'user_id' in session:
+        return redirect(url_for('auth.dashboard'))
+    return redirect(url_for('auth.login'))
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    if 'user_id' in session:
+        return redirect(url_for('auth.dashboard'))
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
