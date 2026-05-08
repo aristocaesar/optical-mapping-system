@@ -1,0 +1,623 @@
+{% extends "base.html" %}
+
+{% block title %}Session Detail - CABLEMAP{% endblock %}
+{% block page_title %}Session Detail: {{ mapping_session.session_id }}{% endblock %}
+
+{% block header_actions %}
+<div style="display: flex; gap: 0.5rem;">
+    <button id="btnExport" class="btn" onclick="exportPDF()"
+        style="background-color: #10b981; color: white; padding: 0.5rem 1rem; border-radius: 6px; font-weight:500; border: none; cursor: pointer;">Export
+        PDF</button>
+    <a href="{{ url_for('web_session.sessions_page') }}" class="btn"
+        style="background: #e2e8f0; color: #1e293b; text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight:500;">Back</a>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .stat-card {
+        background-color: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .stat-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: var(--sidebar-text);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .val-total {
+        color: #3b82f6;
+    }
+
+    .val-baik {
+        color: #10b981;
+    }
+
+    .val-cukup {
+        color: #f59e0b;
+    }
+
+    .val-buruk {
+        color: #ef4444;
+    }
+
+    .map-container {
+        height: 730px;
+        width: 100%;
+        border-radius: 12px;
+        margin-bottom: 2rem;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        z-index: 1;
+        /* fix leaflet overlap with modals/sidebar */
+    }
+
+    .table-container {
+        background-color: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    /* DataTable styles */
+    table.dataTable {
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    table.dataTable thead th,
+    table.dataTable tbody td {
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem;
+    }
+
+    /* Clickable rows */
+    table.dataTable tbody tr {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    table.dataTable tbody tr:hover {
+        background-color: #f1f5f9;
+    }
+
+    .badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-baik {
+        background-color: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .badge-cukup {
+        background-color: rgba(245, 158, 11, 0.1);
+        color: #f59e0b;
+    }
+
+    .badge-buruk {
+        background-color: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+    }
+
+    /* Custom Popup Styles */
+    .leaflet-popup-content-wrapper {
+        border-radius: 8px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    .custom-popup h4 {
+        margin: 0 0 8px 0;
+        font-family: 'Outfit', sans-serif;
+        font-weight: 600;
+    }
+
+    .custom-popup p {
+        margin: 4px 0;
+        font-family: 'Outfit', sans-serif;
+        font-size: 0.9rem;
+    }
+
+    .rec-baik {
+        color: #10b981;
+        font-weight: 600;
+    }
+
+    .rec-cukup {
+        color: #f59e0b;
+        font-weight: 600;
+    }
+
+    .rec-buruk {
+        color: #ef4444;
+        font-weight: 600;
+    }
+
+    /* ID Tooltip */
+    .id-tooltip {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: white;
+        font-weight: 700;
+        font-size: 14px;
+        text-shadow: 0px 0px 4px #000000, 0px 0px 4px #000000;
+    }
+
+    .leaflet-tooltip-bottom:before {
+        display: none;
+        /* remove the triangle */
+    }
+
+    @media (max-width: 1024px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 640px) {
+        .stats-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .map-container {
+            height: 350px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value val-total">{{ total_data }}</div>
+        <div class="stat-label">Total Data Points</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value val-baik">{{ total_baik }}</div>
+        <div class="stat-label">Good Category</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value val-cukup">{{ total_cukup }}</div>
+        <div class="stat-label">Moderate Category</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value val-buruk">{{ total_buruk }}</div>
+        <div class="stat-label">Poor Category</div>
+    </div>
+</div>
+
+<!-- Map -->
+<div id="map" class="map-container"></div>
+
+<!-- Table -->
+<div class="table-container" style="width: 100%; overflow-x: auto;">
+    <h3 style="margin-bottom: 1.5rem;">Data List</h3>
+    <table id="dataTable" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Time</th>
+                <th>Lat</th>
+                <th>Lon</th>
+                <th>pH</th>
+                <th>Hum</th>
+                <th>Temp</th>
+                <th>EC</th>
+                <th>N</th>
+                <th>P</th>
+                <th>K</th>
+                <th>Score</th>
+                <th>Category</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+<script>
+    let map;
+    let mapLayerGroup;
+    let markers = {};
+    let table;
+
+    $(document).ready(function () {
+        // Initialize Map
+        map = L.map('map', {
+            minZoom: 16,
+            preferCanvas: true
+        }).setView([{{ default_lat }}, {{ default_lon }}], 18);
+
+    // Esri Satellite Map
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: 'Tiles &copy; Esri &mdash; Source: Esri',
+        crossOrigin: true
+    }).addTo(map);
+
+    mapLayerGroup = L.featureGroup().addTo(map);
+
+    loadMapData();
+
+    // Initialize DataTable
+    table = $('#dataTable').DataTable({
+        processing: true,
+        serverSide: true,
+        scrollX: true,
+        autoWidth: false,
+        ajax: {
+            url: "{{ url_for('web_session.detail_table_data', id=mapping_session.id) }}",
+            type: 'POST'
+        },
+        columns: [
+            { data: 'id' },
+            { data: 'created_at' },
+            { data: 'lat' },
+            { data: 'lon' },
+            { data: 'ph', render: $.fn.dataTable.render.number(',', '.', 2, '') },
+            { data: 'hum', render: $.fn.dataTable.render.number(',', '.', 2, '') },
+            { data: 'temp', render: $.fn.dataTable.render.number(',', '.', 2, '') },
+            { data: 'ec', render: $.fn.dataTable.render.number(',', '.', 2, '') },
+            { data: 'n' },
+            { data: 'p' },
+            { data: 'k' },
+            { data: 'score', render: $.fn.dataTable.render.number(',', '.', 2, '') },
+            {
+                data: 'category',
+                render: function (data) {
+                    if (data === 'Good') return '<span class="badge badge-baik">Good</span>';
+                    if (data === 'Moderate') return '<span class="badge badge-cukup">Moderate</span>';
+                    return '<span class="badge badge-buruk">Poor</span>';
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                render: function (data, type, row) {
+                    return `<button class="btn btn-sm" style="background:#ef4444; color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;" onclick="deleteSessionData(${row.id}, event)">Delete</button>`;
+                }
+            }
+        ],
+        order: [[0, 'asc']]
+    });
+
+    // Click row to open popup on map
+    $('#dataTable tbody').on('click', 'tr', function (e) {
+        // Prevent if clicking on button
+        if ($(e.target).closest('button').length > 0) return;
+
+        let data = table.row(this).data();
+        if (data && markers[data.id]) {
+            let marker = markers[data.id];
+            map.flyTo(marker.getLatLng(), 18, {
+                duration: 1.5
+            });
+
+            setTimeout(() => {
+                marker.openPopup();
+            }, 1500);
+        }
+    });
+    });
+
+    function loadMapData() {
+        mapLayerGroup.clearLayers();
+        markers = {};
+
+        fetch("{{ url_for('web_session.detail_map_data', id=mapping_session.id) }}")
+            .then(res => res.json())
+            .then(data => {
+                if (data.length === 0) return;
+
+                let bounds = [];
+
+                for (let i = 0; i < data.length; i++) {
+                    let pt = data[i];
+                    let latlng = [pt.lat, pt.lon];
+                    bounds.push(latlng);
+
+                    let color, recText, recClass;
+                    if (pt.score >= 75) {
+                        color = '#10b981';
+                        recText = 'Highly Recommended';
+                        recClass = 'rec-baik';
+                    } else if (pt.score >= 50) {
+                        color = '#fde047';
+                        recText = 'Recommended with precautions';
+                        recClass = 'rec-cukup';
+                    } else {
+                        color = '#ef4444';
+                        recText = 'Not Recommended';
+                        recClass = 'rec-buruk';
+                    }
+
+                    // Draw Line to NEXT point based on CURRENT point's score
+                    if (i < data.length - 1) {
+                        let nextPt = data[i + 1];
+                        let nextLatlng = [nextPt.lat, nextPt.lon];
+
+                        L.polyline([latlng, nextLatlng], {
+                            color: color,
+                            weight: 5,
+                            opacity: 0.9
+                        }).addTo(mapLayerGroup);
+                    }
+
+                    // Create Draggable Marker
+                    let marker = L.marker(latlng, {
+                        draggable: true,
+                        icon: L.divIcon({
+                            className: 'custom-div-icon',
+                            html: `<div style="background-color:${color}; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 4px rgba(0,0,0,0.3);"></div>`,
+                            iconSize: [16, 16],
+                            iconAnchor: [8, 8]
+                        })
+                    }).addTo(mapLayerGroup);
+
+                    // Handle Drag End
+                    marker.on('dragend', function (event) {
+                        let newPos = event.target.getLatLng();
+                        let originalPos = latlng;
+
+                        Swal.fire({
+                            title: 'Move data point?',
+                            text: `Update ID #${pt.id} to new position: ${newPos.lat.toFixed(6)}, ${newPos.lng.toFixed(6)}?`,
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonText: 'Yes, update!',
+                            cancelButtonText: 'Cancel'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                $.ajax({
+                                    url: `/sessions/detail/data/update_coords/${pt.id}`,
+                                    type: 'POST',
+                                    data: {
+                                        lat: newPos.lat,
+                                        lon: newPos.lng
+                                    },
+                                    success: function (res) {
+                                        Swal.fire('Updated!', res.message, 'success');
+                                        table.ajax.reload(null, false);
+                                        loadMapData(); // Redraw lines
+                                    },
+                                    error: function () {
+                                        Swal.fire('Error!', 'Failed to update coordinates.', 'error');
+                                        marker.setLatLng(originalPos);
+                                    }
+                                });
+                            } else {
+                                marker.setLatLng(originalPos);
+                            }
+                        });
+                    });
+
+                    // Add permanent label underneath
+                    marker.bindTooltip(pt.id.toString(), {
+                        permanent: true,
+                        direction: 'bottom',
+                        className: 'id-tooltip',
+                        offset: [0, 8]
+                    }).openTooltip();
+
+                    let popupContent = `
+                        <div class="custom-popup">
+                            <h4>ID #${pt.id}</h4>
+                            <p><strong>Latitude:</strong> ${pt.lat}</p>
+                            <p><strong>Longitude:</strong> ${pt.lon}</p>
+                            <p><strong>Score:</strong> ${pt.score}</p>
+                            <p><strong>Category:</strong> ${pt.category}</p>
+                            <p><strong>Recommendation:</strong> <span class="${recClass}">${recText}</span></p>
+                            <p><strong>Time:</strong> ${pt.created_at}</p>
+                        </div>
+                    `;
+                    marker.bindPopup(popupContent);
+
+                    markers[pt.id] = marker;
+                }
+
+                if (bounds.length > 0) {
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            });
+    }
+
+    function deleteSessionData(id, event) {
+        if (event) event.stopPropagation();
+
+        Swal.fire({
+            title: 'Delete this data point?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#94a3b8',
+            confirmButtonText: 'Yes, delete!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/sessions/detail/data/delete/${id}`,
+                    type: 'POST',
+                    success: function (res) {
+                        Swal.fire('Deleted!', res.message, 'success');
+                        table.ajax.reload(null, false);
+                        loadMapData();
+                    },
+                    error: function () {
+                        Swal.fire('Error!', 'An error occurred.', 'error');
+                    }
+                });
+            }
+        });
+    }
+
+    function exportPDF() {
+        Swal.fire({
+            title: 'Export to PDF?',
+            text: "The system will capture the map and all data for the PDF report.",
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, Export!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                let btn = $('#btnExport');
+                let originalText = btn.text();
+                btn.text('Loading...').prop('disabled', true);
+
+                window.scrollTo(0, 0);
+
+                setTimeout(() => {
+                    html2canvas(document.querySelector("#map"), {
+                        useCORS: true,
+                        allowTaint: false,
+                        scale: 1,
+                        logging: false
+                    }).then(canvas => {
+                        let mapImg = canvas.toDataURL('image/png');
+
+                        $.get("{{ url_for('web_session.detail_all_data', id=mapping_session.id) }}", function (all_data) {
+
+                            let tableBody = [
+                                [
+                                    { text: 'ID', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'Time', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'Lat', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'Lon', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'pH', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'Hum', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'Temp', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'EC', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'N', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'P', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'K', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'Score', bold: true, fillColor: '#f8fafc' },
+                                    { text: 'Category', bold: true, fillColor: '#f8fafc' }
+                                ]
+                            ];
+
+                            all_data.forEach(d => {
+                                let catColor = '#ef4444';
+                                let textColor = '#ffffff';
+                                if (d.category === 'Good') {
+                                    catColor = '#10b981';
+                                } else if (d.category === 'Moderate') {
+                                    catColor = '#fde047';
+                                    textColor = '#1e293b';
+                                }
+
+                                tableBody.push([
+                                    { text: d.id.toString(), fontSize: 8, alignment: 'center' },
+                                    { text: d.created_at, fontSize: 8, fontSize: 8 },
+                                    { text: d.lat.toString(), fontSize: 8, fontSize: 8 },
+                                    { text: d.lon.toString(), fontSize: 8, fontSize: 8 },
+                                    { text: d.ph.toFixed(2), fontSize: 8, alignment: 'center' },
+                                    { text: d.hum.toFixed(2), fontSize: 8, alignment: 'center' },
+                                    { text: d.temp.toFixed(2), fontSize: 8, alignment: 'center' },
+                                    { text: d.ec.toFixed(2), fontSize: 8, alignment: 'center' },
+                                    { text: d.n.toString(), fontSize: 8, alignment: 'center' },
+                                    { text: d.p.toString(), fontSize: 8, alignment: 'center' },
+                                    { text: d.k.toString(), fontSize: 8, alignment: 'center' },
+                                    { text: d.score.toFixed(2), fontSize: 8, alignment: 'center', bold: true },
+                                    { text: d.category, fontSize: 8, alignment: 'center', bold: true, fillColor: catColor, color: textColor }
+                                ]);
+                            });
+
+                            let docDefinition = {
+                                pageOrientation: 'landscape',
+                                content: [
+                                    { text: 'Mapping Session Report: {{ mapping_session.session_id }}', style: 'header', alignment: 'center', margin: [0, 0, 0, 15] },
+                                    { text: 'Route Location Map', style: 'subheader', margin: [0, 5, 0, 5] },
+                                    { image: mapImg, width: 750, height: 450, alignment: 'center', margin: [0, 0, 0, 15] },
+                                    { text: 'Data Summary', style: 'subheader', margin: [0, 10, 0, 5] },
+                                    {
+                                        table: {
+                                            widths: ['auto', 'auto', 'auto', 'auto'],
+                                            body: [
+                                                [{ text: 'Total Data Points', bold: true, fillColor: '#f8fafc', alignment: 'center' }, { text: 'Good Category', bold: true, fillColor: '#f8fafc', alignment: 'center' }, { text: 'Moderate Category', bold: true, fillColor: '#f8fafc', alignment: 'center' }, { text: 'Poor Category', bold: true, fillColor: '#f8fafc', alignment: 'center' }],
+                                                [{ text: '{{ total_data }}', alignment: 'center', fontSize: 8, bold: true }, { text: '{{ total_baik }}', alignment: 'center', fontSize: 8, bold: true, color: '#10b981' }, { text: '{{ total_cukup }}', alignment: 'center', fontSize: 8, bold: true, color: '#f59e0b' }, { text: '{{ total_buruk }}', alignment: 'center', fontSize: 8, bold: true, color: '#ef4444' }]
+                                            ]
+                                        },
+                                        margin: [0, 0, 0, 15]
+                                    },
+                                    { text: 'Data Sensor List', style: 'subheader', margin: [0, 10, 0, 5] },
+                                    {
+                                        table: {
+                                            headerRows: 1,
+                                            widths: ['auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto', 'auto'],
+                                            body: tableBody
+                                        },
+                                        layout: {
+                                            fillColor: function (rowIndex, node, columnIndex) {
+                                                return (rowIndex === 0) ? '#f8fafc' : null;
+                                            },
+                                            hLineWidth: function (i, node) { return 0.5; },
+                                            vLineWidth: function (i, node) { return 0.5; },
+                                            hLineColor: function (i, node) { return '#cbd5e1'; },
+                                            vLineColor: function (i, node) { return '#cbd5e1'; },
+                                            paddingLeft: function (i, node) { return 3; },
+                                            paddingRight: function (i, node) { return 3; },
+                                            paddingTop: function (i, node) { return 2; },
+                                            paddingBottom: function (i, node) { return 2; }
+                                        },
+                                        fontSize: 8.5
+                                    }
+                                ],
+                                styles: {
+                                    header: { fontSize: 20, bold: true, color: '#1e293b' },
+                                    subheader: { fontSize: 14, bold: true, color: '#334155', margin: [0, 5, 0, 3] }
+                                }
+                            };
+
+                            pdfMake.createPdf(docDefinition).download(`Session_Report_{{ mapping_session.session_id }}.pdf`);
+
+                            btn.text(originalText).prop('disabled', false);
+                        }).fail(err => {
+                            Swal.fire('Error', 'Failed to load PDF data from server', 'error');
+                            btn.text(originalText).prop('disabled', false);
+                        });
+                    }).catch(err => {
+                        console.error(err);
+                        Swal.fire('Error', 'Failed to capture satellite map', 'error');
+                        btn.text(originalText).prop('disabled', false);
+                    });
+                }, 500); // 500ms delay to ensure map is static and rendered
+            }
+        });
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+
+{% block title %}Session Management - CABLEMAP{% endblock %}
+{% block page_title %}Mapping Sessions Management{% endblock %}
+
+{% block extra_css %}
+<!-- DataTables CSS -->
+<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+<style>
+    .card {
+        background-color: var(--card-bg);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid var(--border-color);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: 'Outfit', sans-serif;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #059669;
+    }
+
+    .btn-danger {
+        background-color: #ef4444;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background-color: #dc2626;
+    }
+
+    .btn-warning {
+        background-color: #f59e0b;
+        color: white;
+    }
+
+    .btn-warning:hover {
+        background-color: #d97706;
+    }
+
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.5);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.show {
+        display: flex;
+    }
+
+    .modal-content {
+        background: var(--card-bg);
+        width: 100%;
+        max-width: 500px;
+        border-radius: 16px;
+        padding: 2rem;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .modal-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+    }
+
+    .close-modal {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: var(--sidebar-text);
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        font-size: 0.875rem;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        outline: none;
+        font-family: 'Outfit', sans-serif;
+    }
+
+    .form-input:focus {
+        border-color: var(--primary-color);
+    }
+
+    .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* DataTables Overrides */
+    table.dataTable {
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    table.dataTable thead th,
+    table.dataTable tbody td {
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem;
+    }
+
+    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+        background: var(--primary-color) !important;
+        color: white !important;
+        border: none;
+        border-radius: 6px;
+    }
+
+    .badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .badge-active {
+        background-color: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+    }
+
+    .badge-inactive {
+        background-color: rgba(148, 163, 184, 0.1);
+        color: #94a3b8;
+    }
+</style>
+{% endblock %}
+
+{% block header_actions %}
+<button class="btn btn-primary" onclick="openModal('add')">Add Session</button>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <table id="sessionsTable" class="display" style="width:100%">
+        <thead>
+            <tr>
+                <th>No</th>
+                <th>Session ID</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Created At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+<!-- Modal -->
+<div class="modal" id="sessionModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title" id="modalTitle">Add Session</h3>
+            <button class="close-modal" onclick="closeModal()">&times;</button>
+        </div>
+        <form id="sessionForm">
+            <input type="hidden" id="edit_id">
+            <div class="form-group">
+                <label class="form-label" for="name">Session Name</label>
+                <input type="text" id="name" class="form-input" required placeholder="e.g. East Area Mapping">
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="is_active">
+                <label for="is_active">Set as Active Session</label>
+            </div>
+            <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                <button type="button" class="btn" style="background: #f1f5f9; color:#1e293b;"
+                    onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- DataTables JS -->
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<!-- SweetAlert2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+    let table;
+
+    $(document).ready(function () {
+        table = $('#sessionsTable').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: "{{ url_for('web_session.sessions_data') }}",
+                type: 'POST'
+            },
+            columns: [
+                {
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    render: function (data, type, row, meta) {
+                        return meta.row + meta.settings._iDisplayStart + 1;
+                    }
+                },
+                { data: 'session_id' },
+                { data: 'name' },
+                {
+                    data: 'is_active',
+                    render: function (data) {
+                        return data ? '<span class="badge badge-active">Active</span>' : '<span class="badge badge-inactive">Inactive</span>';
+                    }
+                },
+                { data: 'created_at' },
+                {
+                    data: null,
+                    orderable: false,
+                    render: function (data, type, row) {
+                        return `
+                            <a href="/sessions/detail/${row.id}" class="btn btn-sm btn-primary" style="text-decoration:none;">Detail</a>
+                            <button class="btn btn-sm btn-warning" onclick="openModal('edit', ${row.id}, '${row.name}', ${row.is_active})">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteSession(${row.id})">Delete</button>
+                        `;
+                    }
+                }
+            ],
+            order: [[4, 'desc']]
+        });
+
+        $('#sessionForm').on('submit', function (e) {
+            e.preventDefault();
+            let id = $('#edit_id').val();
+            let url = id ? `/sessions/update/${id}` : `/sessions/store`;
+
+            $.ajax({
+                url: url,
+                type: 'POST',
+                data: {
+                    name: $('#name').val(),
+                    is_active: $('#is_active').is(':checked')
+                },
+                success: function (res) {
+                    Swal.fire('Success!', res.message, 'success');
+                    closeModal();
+                    table.ajax.reload(null, false);
+                },
+                error: function (err) {
+                    let msg = err.responseJSON ? err.responseJSON.message : 'An error occurred';
+                    Swal.fire('Error!', msg, 'error');
+                }
+            });
+        });
+    });
+
+    function openModal(mode, id = '', name = '', is_active = false) {
+        $('#modalTitle').text(mode === 'add' ? 'Add Session' : 'Edit Session');
+        $('#edit_id').val(id);
+        $('#name').val(name);
+        $('#is_active').prop('checked', is_active);
+        $('#sessionModal').addClass('show');
+    }
+
+    function closeModal() {
+        $('#sessionModal').removeClass('show');
+        $('#sessionForm')[0].reset();
+    }
+
+    function deleteSession(id) {
+        Swal.fire({
+            title: 'Are you sure?',
+            text: "All related session data will also be deleted!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ef4444',
+            cancelButtonColor: '#94a3b8',
+            confirmButtonText: 'Yes, delete it!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: `/sessions/delete/${id}`,
+                    type: 'POST',
+                    success: function (res) {
+                        Swal.fire('Deleted!', res.message, 'success');
+                        table.ajax.reload(null, false);
+                    },
+                    error: function () {
+                        Swal.fire('Error!', 'Failed to delete session', 'error');
+                    }
+                });
+            }
+        });
+    }
+</script>
+{% endblock %}
