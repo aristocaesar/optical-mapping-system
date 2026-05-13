@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime
+from app.utils.timezone import get_wib_now
 
 class SessionData(db.Model):
     __tablename__ = 'session_data'
@@ -16,4 +16,4 @@ class SessionData(db.Model):
     p = db.Column(db.Integer, nullable=False)
     k = db.Column(db.Integer, nullable=False)
     score = db.Column(db.Float, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=get_wib_now)

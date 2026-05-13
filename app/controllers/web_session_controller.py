@@ -1,7 +1,10 @@
 from flask import Blueprint, render_template, request, jsonify, session, redirect, url_for
+import time
 from app.models.sessions import Session
 from app.models.session_data import SessionData
 from app import db
+
+from app.utils.timezone import get_wib_now
 
 web_session_bp = Blueprint('web_session', __name__)
 
@@ -65,20 +68,19 @@ def store_session():
     name = request.form.get('name')
     is_active = request.form.get('is_active') == 'true'
     
-    last_session = Session.query.order_by(Session.id.desc()).first()
-    if last_session and last_session.session_id.startswith('OCM-'):
-        try:
-            num = int(last_session.session_id.split('-')[1])
-            session_id = f"OCM-{num + 1:05d}"
-        except:
-            session_id = f"OCM-{last_session.id + 1:05d}"
-    else:
-        session_id = "OCM-00001"
+    # Generate session_id using epoch time
+    session_id = f"OCM-{int(time.time())}"
         
     if is_active:
         Session.query.update({Session.is_active: False})
         
-    new_session = Session(session_id=session_id, name=name, is_active=is_active)
+    new_session = Session(
+        session_id=session_id, 
+        name=name, 
+        is_active=is_active,
+        created_at=get_wib_now(),
+        updated_at=get_wib_now()
+    )
     db.session.add(new_session)
     db.session.commit()
     
@@ -96,6 +98,7 @@ def update_session(id):
         
     s.name = name
     s.is_active = is_active
+    s.updated_at = get_wib_now()
     db.session.commit()
     
     return jsonify({'status': 'success', 'message': 'Session updated successfully.'})
@@ -111,6 +114,9 @@ def delete_session(id):
 
 @web_session_bp.route('/sessions/detail/data/delete/<int:id>', methods=['POST'])
 def delete_session_data(id):
+    d = SessionData.query.get_or_404(id)
+    db.session.delete(d)
+    db.session.commit()
     return jsonify({'status': 'success', 'message': 'Data deleted successfully.'})
 
 @web_session_bp.route('/sessions/detail/data/update_coords/<int:id>', methods=['POST'])

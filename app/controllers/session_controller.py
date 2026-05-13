@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from app.models.sessions import Session
 from app.models.session_data import SessionData
 from app import db
+from app.utils.timezone import get_wib_now
 from app.utils.scoring import calculate_piecewise_score
 
 session_bp = Blueprint('session', __name__)
@@ -34,7 +35,8 @@ def store_session():
             n=data.get('n'),
             p=data.get('p'),
             k=data.get('k'),
-            score=calculated_score
+            score=calculated_score,
+            created_at=get_wib_now()
         )
         
         db.session.add(new_data)

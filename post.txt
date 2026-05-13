@@ -1,0 +1,46 @@
+### Panduan Melakukan POST Data ke /store-session menggunakan Postman
+
+Untuk mengirimkan data sensor ke sistem, ikuti langkah-langkah berikut di Postman:
+
+1. **Metode & URL**:
+   - Set metode ke **POST**.
+   - URL: `http://localhost:5000/api/store-session` (Sesuaikan port jika berbeda).
+
+2. **Headers**:
+   - Tambahkan header `Content-Type: application/json`.
+
+3. **Body**:
+   - Pilih tab **Body**.
+   - Pilih opsi **raw**.
+   - Pilih format **JSON**.
+   - Masukkan JSON berikut:
+
+```json
+{
+    "lat": -7.123456,
+    "lon": 112.123456,
+    "hum": 20.5,
+    "temp": 28.5,
+    "ec": 0.5,
+    "ph": 6.8,
+    "n": 100,
+    "p": 50,
+    "k": 75
+}
+```
+
+### Penjelasan Parameter:
+- `lat`: Latitude (Garis Lintang)
+- `lon`: Longitude (Garis Bujur)
+- `hum`: Kelembaban Tanah (%)
+- `temp`: Suhu Tanah (°C)
+- `ec`: Electrical Conductivity (ms/cm)
+- `ph`: Tingkat keasaman tanah (0-14)
+- `n`: Nitrogen (mg/kg)
+- `p`: Phosphorus (mg/kg)
+- `k`: Potassium (mg/kg)
+
+### Catatan Penting:
+- Pastikan ada sesi pemetaan yang **AKTIF** di database sebelum mengirimkan data. Jika tidak ada sesi aktif, server akan mengembalikan error 400.
+- Parameter `n`, `p`, dan `k` saat ini disimpan ke database tetapi belum masuk dalam perhitungan skor (scoring) di `calculate_piecewise_score`.
+- Skor akan dihitung secara otomatis oleh sistem berdasarkan nilai `ph`, `hum`, `temp`, dan `ec`.
